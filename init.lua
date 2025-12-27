@@ -475,6 +475,15 @@ task.spawn(function()
 	local ScriptContext = game:GetService('ScriptContext')
 	
 	errorHandlerConnection = ScriptContext.Error:Connect(function(message, trace, script)
+		local msgStr = tostring(message)
+		-- Suppress accessory/character modification errors that shouldn't crash
+		if msgStr:find('accessory') or msgStr:find('wing') or msgStr:find('character') or 
+		   msgStr:find('Could not find') or msgStr:find('Failed to update') then
+			-- These are non-critical errors, just warn and continue
+			warn(`[${BRAND_NAME}] Non-critical error (suppressed): {msgStr}`)
+			return true -- Suppress the error
+		end
+		
 		warn(`[${BRAND_NAME} Error Handler] {message}`)
 		if trace then
 			warn(`[${BRAND_NAME} Error Handler] Trace: {trace}`)
@@ -484,7 +493,36 @@ task.spawn(function()
 	end)
 end)
 
--- Wrap critical functions to prevent crashes
+task.spawn(function()
+	local Players = game:GetService('Players')
+	local localPlayer = Players.LocalPlayer
+	
+	if localPlayer then
+
+		local function safeGetCharacter()
+			return pcall(function()
+				return localPlayer.Character
+			end)
+		end
+		
+		local function safeGetAccessories(character)
+			if not character then return {} end
+			return pcall(function()
+				local accessories = {}
+				for _, child in pairs(character:GetChildren()) do
+					if child:IsA('Accessory') then
+						table.insert(accessories, child)
+					end
+				end
+				return accessories
+			end)
+		end
+		
+		getgenv().safeGetCharacter = safeGetCharacter
+		getgenv().safeGetAccessories = safeGetAccessories
+	end
+end)
+
 local originalTableSort = table.sort
 table.sort = function(list, comp)
 	if comp == nil then
@@ -495,12 +533,11 @@ table.sort = function(list, comp)
 	end)
 	if not ok then
 		warn(`[${BRAND_NAME}] table.sort error prevented: {err}`)
-		-- Fallback to default sort
+
 		return originalTableSort(list)
 	end
 end
 
--- Global nil function call protection
 local originalCall = nil
 local function safeCall(func, ...)
 	if func == nil then
@@ -514,7 +551,6 @@ local function safeCall(func, ...)
 	return func(...)
 end
 
--- Protect against nil indexing errors
 local protectedEnv = {}
 setmetatable(protectedEnv, {
 	__index = function(t, k)
@@ -537,13 +573,19 @@ local function runMainWithRetries()
 			end)
 			
 			if success and result then
-				-- Execute with error protection - catch nil function calls
+				-- Execute with error protection - catch nil function calls and accessory errors
 				local execOk, execErr = xpcall(result, function(err)
 					local errStr = tostring(err)
 					-- Check for common errors that shouldn't crash
 					if errStr:find('attempt to call a nil value') then
 						warn(`[${BRAND_NAME}] Warning: Nil function call detected, continuing anyway...`)
 						return nil -- Don't propagate this error
+					end
+					-- Suppress accessory/character errors
+					if errStr:find('accessory') or errStr:find('wing') or errStr:find('Could not find') or 
+					   errStr:find('Failed to update') then
+						warn(`[${BRAND_NAME}] Accessory error suppressed: {errStr}`)
+						return nil -- Don't crash on accessory errors
 					end
 					return errStr .. '\n' .. debug.traceback()
 				end)
@@ -561,12 +603,15 @@ local function runMainWithRetries()
 			return true
 		else
 			lastErr = err
-			-- Don't fail completely on nil function calls - they might be optional features
-			if err and tostring(err):find('attempt to call a nil value') then
-				warn(`[${BRAND_NAME}] main.lua has nil function call (attempt {attempt}), but continuing...`)
+			local errStr = tostring(err)
+			-- Don't fail completely on nil function calls or accessory errors - they might be optional features
+			if errStr:find('attempt to call a nil value') or 
+			   errStr:find('accessory') or errStr:find('wing') or 
+			   errStr:find('Could not find') or errStr:find('Failed to update') then
+				warn(`[${BRAND_NAME}] main.lua has non-critical error (attempt {attempt}), but continuing...`)
 				if attempt == 3 then
 					-- On final attempt, continue anyway instead of failing
-					return true, "Continued despite nil function call"
+					return true, "Continued despite non-critical error"
 				end
 			else
 				warn(`[${BRAND_NAME}] main.lua failed (attempt {attempt}): {err}`)
@@ -595,7 +640,7 @@ elseif not closet then
 	end)
 end
 
--- Final protection: Wrap all coroutines and tasks in error handlers
+
 if shared.vape then
 	task.spawn(function()
 		while true do
@@ -611,21 +656,18 @@ if shared.vape then
 	end)
 end
 
--- Prevent network/remote spam that could crash server
 local remoteCallCount = 0
 local lastRemoteCall = 0
 local originalFireServer = nil
 local originalInvokeServer = nil
 
 task.spawn(function()
-	-- Protect RemoteEvents and RemoteFunctions to prevent server crashes
+
 	local ReplicatedStorage = game:GetService('ReplicatedStorage')
 	
-	-- Wrap RemoteEvent:FireServer
 	if ReplicatedStorage then
-		task.wait(5) -- Wait for game to fully load
+		task.wait(5) 
 		
-		-- Monitor remote calls to prevent spam
 		local function safeFireServer(remote, ...)
 			local currentTime = tick()
 			if currentTime - lastRemoteCall < 0.1 then
@@ -645,7 +687,7 @@ task.spawn(function()
 			end)
 		end
 		
-		-- Wrap RemoteFunction:InvokeServer
+
 		local function safeInvokeServer(remote, ...)
 			local currentTime = tick()
 			if currentTime - lastRemoteCall < 0.1 then
@@ -665,7 +707,6 @@ task.spawn(function()
 			end)
 		end
 		
-		-- Store originals in case needed
 		originalFireServer = safeFireServer
 		originalInvokeServer = safeInvokeServer
 	end
@@ -676,11 +717,11 @@ task.spawn(function()
 	while true do
 		task.wait(30) -- Every 30 seconds
 		pcall(function()
-			-- Force garbage collection
+
 			if type(collectgarbage) == 'function' then
 				collectgarbage('collect')
 			end
-			-- Clear any accumulated connections
+
 			if Connections and #Connections > 100 then
 				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
 				for i = 1, #Connections - 50 do
@@ -694,12 +735,12 @@ task.spawn(function()
 	end
 end)
 
--- Memory cleanup to prevent leaks (optional, can be disabled if causing issues)
+
 task.spawn(function()
 	while true do
-		task.wait(60) -- Every 60 seconds
+		task.wait(60) 
 		pcall(function()
-			-- Safe garbage collection
+
 			if type(collectgarbage) == 'function' then
 				collectgarbage()
 			end
