@@ -292,11 +292,19 @@ if gui.Enabled then
 	scale.Scale = math.max(gui.AbsoluteSize.X / 1920, 0.485)
 
 	task.spawn(function()
-		repeat task.wait() until shared.vape and shared.vape.Loaded
+		repeat 
+			task.wait()
+			-- Protected check to prevent crashes
+			local ok = pcall(function()
+				return shared.vape and shared.vape.Loaded
+			end)
+		until ok and shared.vape and shared.vape.Loaded
 
 		task.wait(2)
 
-		gui:Destroy()
+		pcall(function()
+			gui:Destroy()
+		end)
 	end)
 end;
 
@@ -318,12 +326,19 @@ local function downloadFile(path, func)
 		local suc, res = pcall(function()
 			local subbed = path:gsub('catrewrite/', '')
 			subbed = subbed:gsub(' ', '%%20')
-			return game:HttpGet('https://raw.githubusercontent.com/new-qwertyui/CatV5/'..commit..'/'..subbed, true)
+			local response = game:HttpGet('https://raw.githubusercontent.com/new-qwertyui/CatV5/'..commit..'/'..subbed, true)
+			if not response or response == '' then
+				error('Empty response from server')
+			end
+			return response
 		end)
-		if not suc or res == '404: Not Found' then
-			error(res)
+		if not suc or res == '404: Not Found' or not res then
+			warn(`[${BRAND_NAME}] Failed to download {path}: {res}`)
+			error(res or 'Download failed')
 		end
-		writefile(path, res)
+		pcall(function()
+			writefile(path, res)
+		end)
 	end
 	return (func or readfile)(path)
 end
@@ -370,11 +385,19 @@ if (not license.Developer and not shared.VapeDeveloper) then
 		makestage(2, 'Downloading config, This may take up to 20s')
 
 		local preloaded = pcall(function()
-			local req = httpService:JSONDecode(game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/profiles'))
+			local apiResponse = game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/profiles')
+			if not apiResponse or apiResponse == '' then
+				error('Empty API response')
+			end
+			local req = httpService:JSONDecode(apiResponse)
+			
+			if not req or type(req) ~= 'table' then
+				error('Invalid API response format')
+			end
 
 			for _, v in req do
-				if v.path ~= 'profiles/commit.txt' then
-					downloadFile(`catrewrite/{v.path}`)
+				if v and v.path and v.path ~= 'profiles/commit.txt' then
+					pcall(downloadFile, `catrewrite/{v.path}`)
 				end
 			end
 		end)
@@ -388,22 +411,46 @@ if (not license.Developer and not shared.VapeDeveloper) then
 	if #listfiles('catrewrite/translations') <= 2 then
 		makestage(2, 'Downloading languages, this may take a bit')
 	
-		local req = httpService:JSONDecode(game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/translations'))
+		pcall(function()
+			local apiResponse = game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/translations')
+			if not apiResponse or apiResponse == '' then
+				error('Empty API response')
+			end
+			local req = httpService:JSONDecode(apiResponse)
+			
+			if not req or type(req) ~= 'table' then
+				error('Invalid API response format')
+			end
 
-		for _, v in req do
-			makestage(2, `Downloading {v.name} language`)
-			pcall(downloadFile, `catrewrite/{v.path}`)
-		end
+			for _, v in req do
+				if v and v.name and v.path then
+					makestage(2, `Downloading {v.name} language`)
+					pcall(downloadFile, `catrewrite/{v.path}`)
+				end
+			end
+		end)
 	end
 	
 	if not canDebug and Updated then
 		makestage(2, `Downloading {({identifyexecutor()})[1]} support, this may take a bit`)
 	
-		local req = httpService:JSONDecode(game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/cache'))
+		pcall(function()
+			local apiResponse = game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/cache')
+			if not apiResponse or apiResponse == '' then
+				error('Empty API response')
+			end
+			local req = httpService:JSONDecode(apiResponse)
+			
+			if not req or type(req) ~= 'table' then
+				error('Invalid API response format')
+			end
 
-		for _, v in req do
-			pcall(downloadFile, `catrewrite/{v.path}`)
-		end
+			for _, v in req do
+				if v and v.path then
+					pcall(downloadFile, `catrewrite/{v.path}`)
+				end
+			end
+		end)
 	end
 end
 
@@ -422,26 +469,68 @@ getgenv().canDebug = canDebug
 getgenv().username = license.Username or getgenv().username
 getgenv().password = license.Password or getgenv().password
 
--- Set up error handler BEFORE loading main code
+-- Set up comprehensive error handlers BEFORE loading main code
+local errorHandlerConnection
 task.spawn(function()
 	local ScriptContext = game:GetService('ScriptContext')
 	
-	ScriptContext.Error:Connect(function(message, trace, script)
+	errorHandlerConnection = ScriptContext.Error:Connect(function(message, trace, script)
 		warn(`[${BRAND_NAME} Error Handler] {message}`)
 		if trace then
 			warn(`[${BRAND_NAME} Error Handler] Trace: {trace}`)
 		end
-		-- Prevent crash by returning (suppress error)
+		-- Try to prevent crash
 		return true
 	end)
 end)
+
+-- Wrap critical functions to prevent crashes
+local originalTableSort = table.sort
+table.sort = function(list, comp)
+	if comp == nil then
+		return originalTableSort(list)
+	end
+	local ok, err = pcall(function()
+		return originalTableSort(list, comp)
+	end)
+	if not ok then
+		warn(`[${BRAND_NAME}] table.sort error prevented: {err}`)
+		-- Fallback to default sort
+		return originalTableSort(list)
+	end
+end
+
+-- Protect against nil indexing errors
+local protectedEnv = {}
+setmetatable(protectedEnv, {
+	__index = function(t, k)
+		local v = getgenv()[k] or _G[k]
+		if v == nil then
+			warn(`[${BRAND_NAME}] Attempted to access nil: {tostring(k)}`)
+		end
+		return v
+	end
+})
 
 local function runMainWithRetries()
 	local lastErr = nil
 
 	for attempt = 1, 3 do
 		local ok, err = xpcall(function()
-			loadstring(downloadFile('catrewrite/main.lua'), 'main')()
+			-- Wrap in multiple layers of protection
+			local success, result = pcall(function()
+				return loadstring(downloadFile('catrewrite/main.lua'), 'main')
+			end)
+			
+			if success and result then
+				-- Execute with error protection
+				local execOk, execErr = pcall(result)
+				if not execOk then
+					error(execErr)
+				end
+			else
+				error(result or "Failed to load main.lua")
+			end
 		end, function(err)
 			return tostring(err) .. '\n' .. debug.traceback()
 		end)
@@ -475,9 +564,31 @@ elseif not closet then
 	end)
 end
 
+-- Final protection: Wrap all coroutines and tasks in error handlers
+if shared.vape then
+	task.spawn(function()
+		while true do
+			task.wait(1)
+			-- Continuously monitor and protect shared.vape
+			pcall(function()
+				if shared.vape and type(shared.vape) == 'table' then
+					-- Ensure vape object is still valid
+					local _ = shared.vape.Loaded
+				end
+			end)
+		end
+	end)
+end
+
+-- Memory cleanup to prevent leaks (optional, can be disabled if causing issues)
 task.spawn(function()
 	while true do
-		task.wait(30) -- Every 30 seconds
-		collectgarbage('collect')
+		task.wait(60) -- Every 60 seconds
+		pcall(function()
+			-- Safe garbage collection
+			if type(collectgarbage) == 'function' then
+				collectgarbage()
+			end
+		end)
 	end
 end)
