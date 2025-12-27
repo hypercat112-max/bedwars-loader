@@ -453,5 +453,25 @@ table.clear(Connections)
 if not success then
 	error(`Failed to initialize ${BRAND_NAME}: {err}`, 8)
 elseif not closet then
-	loadstring(downloadFile('catrewrite/libraries/annc.lua'), 'announcements.lua')() 
+	pcall(function()
+		loadstring(downloadFile('catrewrite/libraries/annc.lua'), 'announcements.lua')()
+	end)
 end
+
+task.spawn(function()
+	local ScriptContext = game:GetService('ScriptContext')
+	
+	ScriptContext.Error:Connect(function(message, trace, script)
+		warn(`[${BRAND_NAME} Error Handler] {message}`)
+		warn(`[${BRAND_NAME} Error Handler] Trace: {trace}`)
+		-- Don't let errors crash the game
+		return
+	end)
+end)
+
+task.spawn(function()
+	while true do
+		task.wait(30) -- Every 30 seconds
+		collectgarbage('collect')
+	end
+end)
