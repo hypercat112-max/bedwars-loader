@@ -422,12 +422,28 @@ getgenv().canDebug = canDebug
 getgenv().username = license.Username or getgenv().username
 getgenv().password = license.Password or getgenv().password
 
+-- Set up error handler BEFORE loading main code
+task.spawn(function()
+	local ScriptContext = game:GetService('ScriptContext')
+	
+	ScriptContext.Error:Connect(function(message, trace, script)
+		warn(`[${BRAND_NAME} Error Handler] {message}`)
+		if trace then
+			warn(`[${BRAND_NAME} Error Handler] Trace: {trace}`)
+		end
+		-- Prevent crash by returning (suppress error)
+		return true
+	end)
+end)
+
 local function runMainWithRetries()
 	local lastErr = nil
 
 	for attempt = 1, 3 do
-		local ok, err = pcall(function()
+		local ok, err = xpcall(function()
 			loadstring(downloadFile('catrewrite/main.lua'), 'main')()
+		end, function(err)
+			return tostring(err) .. '\n' .. debug.traceback()
 		end)
 
 		if ok then
@@ -451,23 +467,13 @@ end
 table.clear(Connections)
 
 if not success then
-	error(`Failed to initialize ${BRAND_NAME}: {err}`, 8)
+	warn(`[${BRAND_NAME}] Failed to initialize: {err}`)
+	warn(`[${BRAND_NAME}] Continuing anyway to prevent crash...`)
 elseif not closet then
 	pcall(function()
 		loadstring(downloadFile('catrewrite/libraries/annc.lua'), 'announcements.lua')()
 	end)
 end
-
-task.spawn(function()
-	local ScriptContext = game:GetService('ScriptContext')
-	
-	ScriptContext.Error:Connect(function(message, trace, script)
-		warn(`[${BRAND_NAME} Error Handler] {message}`)
-		warn(`[${BRAND_NAME} Error Handler] Trace: {trace}`)
-		-- Don't let errors crash the game
-		return
-	end)
-end)
 
 task.spawn(function()
 	while true do
