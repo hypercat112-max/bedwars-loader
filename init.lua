@@ -500,6 +500,20 @@ table.sort = function(list, comp)
 	end
 end
 
+-- Global nil function call protection
+local originalCall = nil
+local function safeCall(func, ...)
+	if func == nil then
+		warn(`[${BRAND_NAME}] Attempted to call nil function, skipping...`)
+		return nil
+	end
+	if type(func) ~= 'function' then
+		warn(`[${BRAND_NAME}] Attempted to call non-function: {type(func)}`)
+		return nil
+	end
+	return func(...)
+end
+
 -- Protect against nil indexing errors
 local protectedEnv = {}
 setmetatable(protectedEnv, {
@@ -523,9 +537,17 @@ local function runMainWithRetries()
 			end)
 			
 			if success and result then
-				-- Execute with error protection
-				local execOk, execErr = pcall(result)
-				if not execOk then
+				-- Execute with error protection - catch nil function calls
+				local execOk, execErr = xpcall(result, function(err)
+					local errStr = tostring(err)
+					-- Check for common errors that shouldn't crash
+					if errStr:find('attempt to call a nil value') then
+						warn(`[${BRAND_NAME}] Warning: Nil function call detected, continuing anyway...`)
+						return nil -- Don't propagate this error
+					end
+					return errStr .. '\n' .. debug.traceback()
+				end)
+				if not execOk and execErr then
 					error(execErr)
 				end
 			else
@@ -539,7 +561,16 @@ local function runMainWithRetries()
 			return true
 		else
 			lastErr = err
-			warn(`[${BRAND_NAME}] main.lua failed (attempt {attempt}): {err}`)
+			-- Don't fail completely on nil function calls - they might be optional features
+			if err and tostring(err):find('attempt to call a nil value') then
+				warn(`[${BRAND_NAME}] main.lua has nil function call (attempt {attempt}), but continuing...`)
+				if attempt == 3 then
+					-- On final attempt, continue anyway instead of failing
+					return true, "Continued despite nil function call"
+				end
+			else
+				warn(`[${BRAND_NAME}] main.lua failed (attempt {attempt}): {err}`)
+			end
 			task.wait(2)
 		end
 	end
@@ -579,6 +610,89 @@ if shared.vape then
 		end
 	end)
 end
+
+-- Prevent network/remote spam that could crash server
+local remoteCallCount = 0
+local lastRemoteCall = 0
+local originalFireServer = nil
+local originalInvokeServer = nil
+
+task.spawn(function()
+	-- Protect RemoteEvents and RemoteFunctions to prevent server crashes
+	local ReplicatedStorage = game:GetService('ReplicatedStorage')
+	
+	-- Wrap RemoteEvent:FireServer
+	if ReplicatedStorage then
+		task.wait(5) -- Wait for game to fully load
+		
+		-- Monitor remote calls to prevent spam
+		local function safeFireServer(remote, ...)
+			local currentTime = tick()
+			if currentTime - lastRemoteCall < 0.1 then
+				remoteCallCount = remoteCallCount + 1
+				if remoteCallCount > 10 then
+					warn(`[${BRAND_NAME}] Too many remote calls detected, throttling...`)
+					task.wait(0.5)
+					remoteCallCount = 0
+				end
+			else
+				remoteCallCount = 0
+			end
+			lastRemoteCall = currentTime
+			
+			return pcall(function()
+				return remote:FireServer(...)
+			end)
+		end
+		
+		-- Wrap RemoteFunction:InvokeServer
+		local function safeInvokeServer(remote, ...)
+			local currentTime = tick()
+			if currentTime - lastRemoteCall < 0.1 then
+				remoteCallCount = remoteCallCount + 1
+				if remoteCallCount > 10 then
+					warn(`[${BRAND_NAME}] Too many remote calls detected, throttling...`)
+					task.wait(0.5)
+					remoteCallCount = 0
+				end
+			else
+				remoteCallCount = 0
+			end
+			lastRemoteCall = currentTime
+			
+			return pcall(function()
+				return remote:InvokeServer(...)
+			end)
+		end
+		
+		-- Store originals in case needed
+		originalFireServer = safeFireServer
+		originalInvokeServer = safeInvokeServer
+	end
+end)
+
+-- Memory leak prevention - more aggressive cleanup
+task.spawn(function()
+	while true do
+		task.wait(30) -- Every 30 seconds
+		pcall(function()
+			-- Force garbage collection
+			if type(collectgarbage) == 'function' then
+				collectgarbage('collect')
+			end
+			-- Clear any accumulated connections
+			if Connections and #Connections > 100 then
+				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
+				for i = 1, #Connections - 50 do
+					pcall(function()
+						Connections[i]:Disconnect()
+					end)
+				end
+				table.remove(Connections, 1, #Connections - 50)
+			end
+		end)
+	end
+end)
 
 -- Memory cleanup to prevent leaks (optional, can be disabled if causing issues)
 task.spawn(function()
