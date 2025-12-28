@@ -312,22 +312,53 @@ local canDebug = debug.getupvalue ~= nil
 
 local function downloadFile(path, func)
 	if not isfile(path) then
-		local suc, res = pcall(function()
-			local subbed = path:gsub('catrewrite/', '')
-			subbed = subbed:gsub(' ', '%%20')
-			local response = game:HttpGet('https://raw.githubusercontent.com/'..GITHUB_USER..'/'..GITHUB_REPO..'/'..commit..'/'..subbed, true)
-			if not response or response == '' then
-				error('Empty response from server')
+		local suc, res = nil, nil
+		local attempts = 0
+		local maxAttempts = 3
+		
+		repeat
+			attempts = attempts + 1
+			suc, res = pcall(function()
+				local subbed = path:gsub('catrewrite/', '')
+				subbed = subbed:gsub(' ', '%%20')
+				local url = 'https://raw.githubusercontent.com/'..GITHUB_USER..'/'..GITHUB_REPO..'/'..commit..'/'..subbed
+				local response = game:HttpGet(url, true)
+				if not response or response == '' then
+					error('Empty response from server')
+				end
+				return response
+			end)
+			
+			if not suc or res == '404: Not Found' or not res then
+				if attempts < maxAttempts then
+					warn(`[${BRAND_NAME}] Failed to download {path} (attempt {attempts}/{maxAttempts}), retrying...`)
+					task.wait(2)
+				else
+					warn(`[${BRAND_NAME}] Failed to download {path} after {maxAttempts} attempts: {res}`)
+					-- Try downloading from original repo as fallback
+					local fallbackSuc, fallbackRes = pcall(function()
+						local subbed = path:gsub('catrewrite/', '')
+						subbed = subbed:gsub(' ', '%%20')
+						return game:HttpGet('https://raw.githubusercontent.com/new-qwertyui/CatV5/'..commit..'/'..subbed, true)
+					end)
+					if fallbackSuc and fallbackRes and fallbackRes ~= '404: Not Found' then
+						warn(`[${BRAND_NAME}] Using fallback repo for {path}`)
+						res = fallbackRes
+						suc = true
+					else
+						error(res or 'Download failed after retries')
+					end
+				end
 			end
-			return response
-		end)
-		if not suc or res == '404: Not Found' or not res then
-			warn(`[${BRAND_NAME}] Failed to download {path}: {res}`)
-			error(res or 'Download failed')
+		until suc or attempts >= maxAttempts
+		
+		if suc and res then
+			pcall(function()
+				writefile(path, res)
+			end)
+		else
+			error('Failed to download '..path)
 		end
-		pcall(function()
-			writefile(path, res)
-		end)
 	end
 	return (func or readfile)(path)
 end
@@ -400,55 +431,22 @@ if (not license.Developer and not shared.VapeDeveloper) then
 	end
 
 	if #listfiles('catrewrite/translations') <= 2 then
-		makestage(2, 'Downloading languages, this may take a bit')
-	
-		pcall(function()
-			local apiResponse = game:HttpGet('https://api.github.com/repos/'..GITHUB_USER..'/'..GITHUB_REPO..'/contents/translations')
-			if not apiResponse or apiResponse == '' then
-				error('Empty API response')
-			end
-			local req = httpService:JSONDecode(apiResponse)
-			
-			if not req or type(req) ~= 'table' then
-				error('Invalid API response format')
-			end
-
-			for _, v in req do
-				if v and v.name and v.path then
-					makestage(2, `Downloading {v.name} language`)
-					pcall(downloadFile, `catrewrite/{v.path}`)
-				end
-			end
-		end)
+		makestage(2, 'Skipping translations (optional)')
 	end
 	
 	if not canDebug and Updated then
-		makestage(2, `Downloading {({identifyexecutor()})[1]} support, this may take a bit`)
-	
-		pcall(function()
-			local apiResponse = game:HttpGet('https://api.github.com/repos/'..GITHUB_USER..'/'..GITHUB_REPO..'/contents/cache')
-			if not apiResponse or apiResponse == '' then
-				error('Empty API response')
-			end
-			local req = httpService:JSONDecode(apiResponse)
-			
-			if not req or type(req) ~= 'table' then
-				error('Invalid API response format')
-			end
-
-			for _, v in req do
-				if v and v.path then
-					pcall(downloadFile, `catrewrite/{v.path}`)
-				end
-			end
-		end)
+		makestage(2, 'Skipping cache (optional)')
 	end
 end
 
 writefile('catrewrite/profiles/commit.txt', commit)
+
+makestage(3, 'Downloading core libraries...')
 pcall(downloadFile, 'catrewrite/libraries/pathfind.lua')
 pcall(downloadFile, 'catrewrite/init.lua')
 pcall(downloadFile, 'catrewrite/libraries/oldpath.lua')
+
+makestage(4, 'Loading main script...')
 
 shared.VapeDeveloper = developer
 getgenv().used_init = true
