@@ -461,11 +461,16 @@ local errorCount = 0
 local lastErrorTime = 0
 local seenErrors = {}
 local errorSuppressTime = {}
+local errorHandlerEnabled = true
 
 task.spawn(function()
 	local ScriptContext = game:GetService('ScriptContext')
 	
 	errorHandlerConnection = ScriptContext.Error:Connect(function(message, trace, script)
+		if not errorHandlerEnabled then
+			return true
+		end
+		
 		local msgStr = tostring(message)
 		local currentTime = tick()
 		
@@ -477,26 +482,21 @@ task.spawn(function()
 		errorCount = errorCount + 1
 		lastErrorTime = currentTime
 		
-		if errorCount > 20 then
+		if errorCount > 15 then
 			return true
 		end
 		
-		if errorCount > 100 then
-			warn(`[${BRAND_NAME}] Critical: Too many errors ({errorCount}), disabling error handler to prevent crash...`)
-			pcall(function()
-				if errorHandlerConnection then
-					errorHandlerConnection:Disconnect()
-				end
-			end)
+		if errorCount > 50 then
+			warn(`[${BRAND_NAME}] Too many errors, disabling error logging...`)
+			errorHandlerEnabled = false
 			return true
 		end
 		
-		local errorKey = msgStr:match('^[^:]+') or msgStr
+		local errorKey = msgStr:match('^[^:]+') or msgStr:sub(1, 50)
 		if seenErrors[errorKey] then
 			seenErrors[errorKey] = seenErrors[errorKey] + 1
-			if seenErrors[errorKey] > 5 then
-				if not errorSuppressTime[errorKey] or currentTime - errorSuppressTime[errorKey] > 30 then
-					warn(`[${BRAND_NAME}] Error "{errorKey}" repeated {seenErrors[errorKey]} times, suppressing for 30 seconds...`)
+			if seenErrors[errorKey] > 3 then
+				if not errorSuppressTime[errorKey] or currentTime - errorSuppressTime[errorKey] > 60 then
 					errorSuppressTime[errorKey] = currentTime
 				end
 				return true
@@ -514,10 +514,6 @@ task.spawn(function()
 			return true
 		end
 		
-		warn(`[${BRAND_NAME} Error Handler] {message}`)
-		if trace then
-			warn(`[${BRAND_NAME} Error Handler] Trace: {trace}`)
-		end
 		return true
 	end)
 end)
@@ -603,22 +599,25 @@ end
 if shared.vape then
 	task.spawn(function()
 		local checkCount = 0
+		local lastCheck = tick()
 		while true do
-			task.wait(5)
-			checkCount = checkCount + 1
-			
-			pcall(function()
+			local ok = pcall(function()
+				task.wait(10)
+				checkCount = checkCount + 1
+				
 				if shared.vape and type(shared.vape) == 'table' then
 					local _ = shared.vape.Loaded
 				end
-			end)
-			
-			if checkCount % 30 == 0 then
-				pcall(function()
+				
+				if checkCount % 12 == 0 then
 					if type(collectgarbage) == 'function' then
 						collectgarbage('collect')
 					end
-				end)
+				end
+			end)
+			
+			if not ok then
+				task.wait(30)
 			end
 		end
 	end)
@@ -627,15 +626,16 @@ end
 task.spawn(function()
 	local cleanupCount = 0
 	local lastMemory = 0
+	local crashCount = 0
 	while true do
 		local ok = pcall(function()
-			task.wait(15)
+			task.wait(10)
 			cleanupCount = cleanupCount + 1
+			crashCount = 0
 			
 			if type(collectgarbage) == 'function' then
 				local currentMemory = collectgarbage('count')
-				if currentMemory > lastMemory * 1.5 and lastMemory > 0 then
-					warn(`[${BRAND_NAME}] Memory spike detected ({currentMemory}MB), forcing cleanup...`)
+				if lastMemory > 0 and currentMemory > lastMemory * 1.3 then
 					collectgarbage('collect')
 					collectgarbage('collect')
 					collectgarbage('collect')
@@ -645,9 +645,8 @@ task.spawn(function()
 				lastMemory = currentMemory
 			end
 			
-			if Connections and #Connections > 30 then
-				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
-				local toRemove = #Connections - 15
+			if Connections and #Connections > 25 then
+				local toRemove = #Connections - 10
 				for i = toRemove, 1, -1 do
 					pcall(function()
 						if Connections[i] then
@@ -658,10 +657,9 @@ task.spawn(function()
 				end
 			end
 			
-			if cleanupCount % 6 == 0 then
+			if cleanupCount % 4 == 0 then
 				pcall(function()
 					if type(collectgarbage) == 'function' then
-						collectgarbage('collect')
 						collectgarbage('collect')
 					end
 				end)
@@ -669,48 +667,70 @@ task.spawn(function()
 		end)
 		
 		if not ok then
-			task.wait(30)
+			crashCount = crashCount + 1
+			if crashCount > 3 then
+				break
+			end
+			task.wait(20)
 		end
 	end
 end)
 
 task.spawn(function()
 	local healthCheckCount = 0
+	local lastHealthCheck = tick()
 	while true do
-		task.wait(30)
-		healthCheckCount = healthCheckCount + 1
-		
-		pcall(function()
+		local ok = pcall(function()
+			task.wait(20)
+			healthCheckCount = healthCheckCount + 1
+			
 			local RunService = game:GetService('RunService')
 			if not RunService or not RunService:IsRunning() then
 				return
 			end
 			
-			if healthCheckCount % 4 == 0 then
-				local services = {
-					'Players',
-					'ReplicatedStorage',
-					'UserInputService',
-					'TweenService'
-				}
+			if healthCheckCount % 6 == 0 then
+				if type(collectgarbage) == 'function' then
+					collectgarbage('collect')
+				end
+			end
+		end)
+		
+		if not ok then
+			task.wait(40)
+		end
+	end
+end)
+
+task.spawn(function()
+	local watchdogCount = 0
+	while true do
+		task.wait(60)
+		watchdogCount = watchdogCount + 1
+		
+		pcall(function()
+			if type(collectgarbage) == 'function' then
+				local memBefore = collectgarbage('count')
+				collectgarbage('collect')
+				collectgarbage('collect')
+				local memAfter = collectgarbage('count')
 				
-				for _, serviceName in ipairs(services) do
-					pcall(function()
-						local service = game:GetService(serviceName)
-						if not service then
-							warn(`[${BRAND_NAME}] Warning: Service {serviceName} not found`)
-						end
-					end)
+				if memBefore > 500 then
+					warn(`[${BRAND_NAME}] High memory usage: {memBefore}MB -> {memAfter}MB`)
 				end
 			end
 			
-			if healthCheckCount % 10 == 0 then
-				pcall(function()
-					if type(collectgarbage) == 'function' then
-						collectgarbage('collect')
-						collectgarbage('collect')
+			if watchdogCount % 3 == 0 then
+				if Connections and #Connections > 20 then
+					for i = #Connections - 10, 1, -1 do
+						pcall(function()
+							if Connections[i] then
+								Connections[i]:Disconnect()
+							end
+						end)
+						Connections[i] = nil
 					end
-				end)
+				end
 			end
 		end)
 	end
