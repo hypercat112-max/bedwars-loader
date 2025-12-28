@@ -78,6 +78,10 @@ local function createinstance(class : string, properties : {[string] : any})
 end
 
 local function addCallback(image : ImageLabel | ImageButton, ...)
+	if not (image:IsA('ImageLabel') or image:IsA('ImageButton')) then
+		return
+	end
+	
 	local Original = image.ImageColor3
 	
 	table.insert(Connections, image.MouseEnter:Connect(function()  
@@ -115,20 +119,17 @@ if gui.Enabled then
 	local window = createinstance('ImageLabel', {
 		Name = 'Main',
 		Parent = gui,
-		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
-		BackgroundTransparency = 0,
+		BackgroundTransparency = 1,
 		Size = UDim2.fromOffset(685, 399),
 		ZIndex = 1,
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		ScaleType = Enum.ScaleType.Fit,
-		Image = 'rbxassetid://93496634716737',
-		Visible = true
+		Image = 'rbxassetid://93496634716737'
 	})
-	
-	Instance.new('UICorner', window)
 
-	local scale
+	local scale = Instance.new('UIScale', window)
+	scale.Scale = math.max(gui.AbsoluteSize.X / 1920, 0.485)
 	
 	window.InputBegan:Connect(function(inputObj)
 		if
@@ -167,7 +168,7 @@ if gui.Enabled then
 
 	local exit = createinstance('ImageButton', {
 		Name = 'Exit',
-		Parent = gui.Main,
+		Parent = window,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(624, 23),
 		Size = UDim2.fromOffset(40, 30),
@@ -184,7 +185,7 @@ if gui.Enabled then
 
 	createinstance('ImageLabel', {
 		Name = 'Icon',
-		Parent = gui.Main.Exit,
+		Parent = exit,
 		BackgroundTransparency = 1,
 		Position = UDim2.new(0, 10, 0.5, 0),
 		Size = UDim2.fromOffset(16, 16),
@@ -198,7 +199,7 @@ if gui.Enabled then
 
 	local minimize = createinstance('ImageButton', {
 		Name = 'Minimize',
-		Parent = gui.Main,
+		Parent = window,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(582, 23),
 		ZIndex = 2,
@@ -213,7 +214,7 @@ if gui.Enabled then
 
 	createinstance('ImageLabel', {
 		Name = 'Icon',
-		Parent = gui.Main.Minimize,
+		Parent = minimize,
 		BackgroundTransparency = 1,
 		Position = UDim2.new(0, 14, 0.5, 0),
 		Size = UDim2.fromOffset(16, 16),
@@ -226,23 +227,22 @@ if gui.Enabled then
 
 	createinstance('TextLabel', {
 		Name = 'Title',
-		Parent = gui.Main,
-		AnchorPoint = Vector2.new(0.5, 0.31),
+		Parent = window,
+		AnchorPoint = Vector2.new(0.48, 0.31),
 		BackgroundTransparency = 1,
-		ZIndex = 3,
-		Position = UDim2.fromScale(0.5, 0.31),
-		Size = UDim2.fromOffset(300, 40),
+		ZIndex = 2,
+		Position = UDim2.fromScale(0.48, 0.31),
+		Size = UDim2.fromOffset(200, 40),
 		Text = BRAND_NAME,
 		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = 20,
-		Font = Enum.Font.GothamBold,
-		TextStrokeTransparency = 0.7,
-		TextStrokeColor3 = Color3.new(0, 0, 0)
+		TextSize = 16,
+		Font = Enum.Font.Arial,
+		TextStrokeTransparency = 0.5
 	})
 
 	createinstance('Frame', {
 		Name = 'loadbar',
-		Parent = gui.Main,
+		Parent = window,
 		AnchorPoint = Vector2.new(0.5, 0.53),
 		BackgroundColor3 = Color3.fromRGB(20, 20, 20),
 		BorderSizePixel = 0,
@@ -253,7 +253,7 @@ if gui.Enabled then
 
 	createinstance('Frame', {
 		Name = 'fullbar',
-		Parent = gui.Main.loadbar,
+		Parent = window.loadbar,
 		BackgroundColor3 = Color3.fromRGB(3, 102, 79),
 		BorderSizePixel = 0,
 		Size = UDim2.new(0, 0, 1, 0),
@@ -262,7 +262,7 @@ if gui.Enabled then
 
 	createinstance('TextLabel', {
 		Name = 'action',
-		Parent = gui.Main,
+		Parent = window,
 		BackgroundTransparency = 1,
 		Position = UDim2.fromScale(0.353284657, 0.556391001),
 		Size = UDim2.fromOffset(200, 15),
@@ -274,26 +274,8 @@ if gui.Enabled then
 		TextTransparency = 0.3
 	})
 
-	Instance.new('UICorner', gui.Main.loadbar)
-	Instance.new('UICorner', gui.Main.loadbar.fullbar)
-	
-	scale = Instance.new('UIScale', gui.Main)
-	scale.Scale = math.max(gui.AbsoluteSize.X / 1920, 0.485)
-	
-	task.wait(0.1)
-	
-	if gui.Main then
-		gui.Main.Visible = true
-		if gui.Main.BackgroundTransparency == 1 then
-			gui.Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-			gui.Main.BackgroundTransparency = 0
-		end
-		for _, child in pairs(gui.Main:GetDescendants()) do
-			if child:IsA('GuiObject') then
-				child.Visible = true
-			end
-		end
-	end
+	Instance.new('UICorner', window.loadbar)
+	Instance.new('UICorner', window.loadbar.fullbar)
 
 	task.spawn(function()
 		repeat 
@@ -357,11 +339,13 @@ local function wipeFolder(path)
 end 
 
 local function makestage(stage, package)
-	if gui.Enabled then
+	if gui.Enabled and gui.Main and gui.Main.loadbar and gui.Main.loadbar.fullbar then
 		tweenService:Create(gui.Main.loadbar.fullbar, TweenInfo.new(0.4, Enum.EasingStyle.Quad), {
 			Size = stages[stage]
 		}):Play()
-		gui.Main.action.Text = package or ''
+		if gui.Main.action then
+			gui.Main.action.Text = package or ''
+		end
 	end
 end
 
@@ -626,14 +610,6 @@ if shared.vape then
 end
 
 task.spawn(function()
-	local ReplicatedStorage = game:GetService('ReplicatedStorage')
-	
-	if ReplicatedStorage then
-		task.wait(5)
-	end
-end)
-
-task.spawn(function()
 	local cleanupCount = 0
 	while true do
 		task.wait(20)
@@ -710,4 +686,3 @@ task.spawn(function()
 		end)
 	end
 end)
-
