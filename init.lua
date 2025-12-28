@@ -20,6 +20,10 @@ local commit = license.Commit or nil
 
 local BRAND_NAME = 'Not Cheating Scripts'
 
+-- Your GitHub repository
+local GITHUB_USER = 'hypercat112-max'
+local GITHUB_REPO = 'bedwars-loader'
+
 local loadstring = function(...)
 	local res, err = loadstring(...)
 	if err then
@@ -30,7 +34,7 @@ end
 
 if not commit or commit == 'main' then
 	local success, subbed = pcall(function()
-		return game:HttpGet('https://github.com/new-qwertyui/CatV5')
+		return game:HttpGet('https://github.com/'..GITHUB_USER..'/'..GITHUB_REPO)
 	end)
 	
 	if success and subbed and type(subbed) == 'string' then
@@ -311,7 +315,7 @@ local function downloadFile(path, func)
 		local suc, res = pcall(function()
 			local subbed = path:gsub('catrewrite/', '')
 			subbed = subbed:gsub(' ', '%%20')
-			local response = game:HttpGet('https://raw.githubusercontent.com/new-qwertyui/CatV5/'..commit..'/'..subbed, true)
+			local response = game:HttpGet('https://raw.githubusercontent.com/'..GITHUB_USER..'/'..GITHUB_REPO..'/'..commit..'/'..subbed, true)
 			if not response or response == '' then
 				error('Empty response from server')
 			end
@@ -372,7 +376,7 @@ if (not license.Developer and not shared.VapeDeveloper) then
 		makestage(2, 'Downloading config, This may take up to 20s')
 
 		local preloaded = pcall(function()
-			local apiResponse = game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/profiles')
+			local apiResponse = game:HttpGet('https://api.github.com/repos/'..GITHUB_USER..'/'..GITHUB_REPO..'/contents/profiles')
 			if not apiResponse or apiResponse == '' then
 				error('Empty API response')
 			end
@@ -399,7 +403,7 @@ if (not license.Developer and not shared.VapeDeveloper) then
 		makestage(2, 'Downloading languages, this may take a bit')
 	
 		pcall(function()
-			local apiResponse = game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/translations')
+			local apiResponse = game:HttpGet('https://api.github.com/repos/'..GITHUB_USER..'/'..GITHUB_REPO..'/contents/translations')
 			if not apiResponse or apiResponse == '' then
 				error('Empty API response')
 			end
@@ -422,7 +426,7 @@ if (not license.Developer and not shared.VapeDeveloper) then
 		makestage(2, `Downloading {({identifyexecutor()})[1]} support, this may take a bit`)
 	
 		pcall(function()
-			local apiResponse = game:HttpGet('https://api.github.com/repos/new-qwertyui/CatV5/contents/cache')
+			local apiResponse = game:HttpGet('https://api.github.com/repos/'..GITHUB_USER..'/'..GITHUB_REPO..'/contents/cache')
 			if not apiResponse or apiResponse == '' then
 				error('Empty API response')
 			end
@@ -482,13 +486,18 @@ task.spawn(function()
 		errorCount = errorCount + 1
 		lastErrorTime = currentTime
 		
-		if errorCount > 15 then
+		if errorCount > 10 then
 			return true
 		end
 		
-		if errorCount > 50 then
-			warn(`[${BRAND_NAME}] Too many errors, disabling error logging...`)
+		if errorCount > 30 then
+			warn(`[${BRAND_NAME}] Too many errors ({errorCount}), disabling error handler to prevent crash...`)
 			errorHandlerEnabled = false
+			pcall(function()
+				if errorHandlerConnection then
+					errorHandlerConnection:Disconnect()
+				end
+			end)
 			return true
 		end
 		
@@ -669,9 +678,11 @@ task.spawn(function()
 		if not ok then
 			crashCount = crashCount + 1
 			if crashCount > 3 then
-				break
+				task.wait(30)
+				crashCount = 0
+			else
+				task.wait(15)
 			end
-			task.wait(20)
 		end
 	end
 end)
@@ -704,31 +715,103 @@ end)
 
 task.spawn(function()
 	local watchdogCount = 0
+	local lastMemory = 0
+	local crashCount = 0
 	while true do
-		task.wait(60)
-		watchdogCount = watchdogCount + 1
-		
-		pcall(function()
+		local ok = pcall(function()
+			task.wait(30)
+			watchdogCount = watchdogCount + 1
+			crashCount = 0
+			
 			if type(collectgarbage) == 'function' then
 				local memBefore = collectgarbage('count')
 				collectgarbage('collect')
 				collectgarbage('collect')
+				collectgarbage('collect')
 				local memAfter = collectgarbage('count')
 				
-				if memBefore > 500 then
-					warn(`[${BRAND_NAME}] High memory usage: {memBefore}MB -> {memAfter}MB`)
+				if memBefore > 300 then
+					warn(`[${BRAND_NAME}] High memory: {memBefore}MB -> {memAfter}MB, forcing cleanup...`)
+					for i = 1, 5 do
+						collectgarbage('collect')
+					end
 				end
+				
+				if lastMemory > 0 and memBefore > lastMemory * 1.5 then
+					warn(`[${BRAND_NAME}] Memory spike detected! {lastMemory}MB -> {memBefore}MB`)
+					for i = 1, 10 do
+						collectgarbage('collect')
+					end
+				end
+				lastMemory = memAfter
 			end
 			
-			if watchdogCount % 3 == 0 then
-				if Connections and #Connections > 20 then
-					for i = #Connections - 10, 1, -1 do
+			if watchdogCount % 2 == 0 then
+				if Connections and #Connections > 15 then
+					local toRemove = #Connections - 5
+					for i = toRemove, 1, -1 do
 						pcall(function()
 							if Connections[i] then
 								Connections[i]:Disconnect()
 							end
 						end)
 						Connections[i] = nil
+					end
+				end
+			end
+			
+			if watchdogCount % 5 == 0 then
+				pcall(function()
+					if shared.vape and type(shared.vape) == 'table' then
+						local _ = shared.vape.Loaded
+					end
+				end)
+			end
+		end)
+		
+		if not ok then
+			crashCount = crashCount + 1
+			if crashCount > 5 then
+				warn(`[${BRAND_NAME}] Watchdog crashed too many times, restarting...`)
+				crashCount = 0
+			end
+			task.wait(60)
+		end
+	end
+end)
+
+task.spawn(function()
+	local survivalCount = 0
+	while true do
+		task.wait(60)
+		survivalCount = survivalCount + 1
+		
+		pcall(function()
+			if type(collectgarbage) == 'function' then
+				for i = 1, 3 do
+					collectgarbage('collect')
+				end
+			end
+			
+			if survivalCount % 2 == 0 then
+				if Connections and #Connections > 10 then
+					for i = #Connections - 5, 1, -1 do
+						pcall(function()
+							if Connections[i] then
+								Connections[i]:Disconnect()
+							end
+						end)
+						Connections[i] = nil
+					end
+				end
+			end
+			
+			if survivalCount >= 5 then
+				survivalCount = 0
+				warn(`[${BRAND_NAME}] Still running after 5 minutes! Memory cleanup...`)
+				if type(collectgarbage) == 'function' then
+					for i = 1, 10 do
+						collectgarbage('collect')
 					end
 				end
 			end

@@ -1,3 +1,4 @@
+local BRAND_NAME = 'Not Cheating Scripts'
 local vape
 local closet = getgenv().closet
 local makestage = getgenv().makestage or function() end
@@ -26,10 +27,13 @@ end
 local httpService = cloneref(game:GetService('HttpService'))
 local playersService = cloneref(game:GetService('Players'))
 
+local GITHUB_USER = 'hypercat112-max'
+local GITHUB_REPO = 'bedwars-loader'
+
 local function downloadFile(path, func)
 	if not isfile(path) or not shared.VapeDeveloper then
 		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/new-qwertyui/CatV5/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('catrewrite/', '')), true)
+			return game:HttpGet('https://raw.githubusercontent.com/'..GITHUB_USER..'/'..GITHUB_REPO..'/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('catrewrite/', '')), true)
 		end)
 		if not suc or res == '404: Not Found' then
 			error(res)
@@ -49,20 +53,44 @@ local function finishLoading()
 
 	task.spawn(function()
 		local saveCount = 0
+		local crashCount = 0
 		repeat
-			pcall(function()
-				vape:Save()
+			local ok = pcall(function()
+				if vape and vape.Save then
+					vape:Save()
+				end
 			end)
+			
+			if not ok then
+				crashCount = crashCount + 1
+				if crashCount > 3 then
+					warn(`[${BRAND_NAME}] Save loop crashed too many times, disabling...`)
+					break
+				end
+			else
+				crashCount = 0
+			end
+			
 			saveCount = saveCount + 1
-			if saveCount % 6 == 0 then
+			if saveCount % 3 == 0 then
 				pcall(function()
 					if type(collectgarbage) == 'function' then
 						collectgarbage('collect')
 					end
 				end)
 			end
-			task.wait(10)
-		until not vape.Loaded
+			
+			if saveCount % 12 == 0 then
+				pcall(function()
+					if type(collectgarbage) == 'function' then
+						collectgarbage('collect')
+						collectgarbage('collect')
+					end
+				end)
+			end
+			
+			task.wait(15)
+		until not vape or not vape.Loaded
 	end)
 
 	local teleportedServers
@@ -146,8 +174,44 @@ if shared.vape then
 	shared.vape:Uninject()
 end
 
-vape = loadstring(downloadFile('catrewrite/guis/'..gui..'.lua'), 'gui')()
-shared.vape = vape
+local guiSuccess, guiResult = pcall(function()
+	return loadstring(downloadFile('catrewrite/guis/'..gui..'.lua'), 'gui')
+end)
+
+if not guiSuccess or not guiResult then
+	warn(`[${BRAND_NAME}] Failed to load GUI {gui}, trying 'new'...`)
+	gui = 'new'
+	guiSuccess, guiResult = pcall(function()
+		return loadstring(downloadFile('catrewrite/guis/new.lua'), 'gui')
+	end)
+end
+
+if guiSuccess and guiResult then
+	local execSuccess, execResult = xpcall(guiResult, function(err)
+		local errStr = tostring(err)
+		if errStr:find('Actor environment') or errStr:find('attempt to call a nil value') then
+			return nil
+		end
+		return errStr
+	end)
+	
+	if execSuccess and execResult then
+		vape = execResult
+		shared.vape = vape
+	else
+		if execResult and tostring(execResult):find('Actor environment') then
+			warn(`[${BRAND_NAME}] GUI Actor environment error (non-critical), continuing...`)
+			-- Try to continue anyway
+			if not vape then
+				error('Failed to execute GUI: '..tostring(execResult))
+			end
+		else
+			error('Failed to execute GUI: '..tostring(execResult))
+		end
+	end
+else
+	error('Failed to load GUI: '..tostring(guiResult))
+end
 
 local function callback(func)
 	local success, result
@@ -176,7 +240,7 @@ if not shared.VapeIndependent then
 		else
 			if not shared.VapeDeveloper then
 				local suc, res = pcall(function()
-					return game:HttpGet('https://raw.githubusercontent.com/new-qwertyui/CatV5/'..readfile('catrewrite/profiles/commit.txt')..'/games/'..game.PlaceId..'.lua', true)
+					return game:HttpGet('https://raw.githubusercontent.com/'..GITHUB_USER..'/'..GITHUB_REPO..'/'..readfile('catrewrite/profiles/commit.txt')..'/games/'..game.PlaceId..'.lua', true)
 				end)
 				if suc and res ~= '404: Not Found' then
 					loadstring(downloadFile('catrewrite/games/'..game.PlaceId..'.lua'), tostring(game.PlaceId))(...)
@@ -195,7 +259,7 @@ if not shared.VapeIndependent then
 						local errStr = tostring(err)
 						if errStr:find('attempt to call a nil value') or
 						   errStr:find('Parent property') or errStr:find('is locked') or
-						   errStr:find('is not a valid member') then
+						   errStr:find('is not a valid member') or errStr:find('Actor environment') then
 							return nil
 						end
 						return errStr
@@ -245,3 +309,4 @@ else
 	vape.Init = finishLoading
 	return vape
 end
+
