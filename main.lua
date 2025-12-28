@@ -32,12 +32,39 @@ local GITHUB_REPO = 'bedwars-loader'
 
 local function downloadFile(path, func)
 	if not isfile(path) or not shared.VapeDeveloper then
-		local suc, res = pcall(function()
-			return game:HttpGet('https://raw.githubusercontent.com/'..GITHUB_USER..'/'..GITHUB_REPO..'/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('catrewrite/', '')), true)
-		end)
-		if not suc or res == '404: Not Found' then
-			error(res)
+		local suc, res = nil, nil
+		local attempts = 0
+		local maxAttempts = 2
+		
+		repeat
+			attempts = attempts + 1
+			suc, res = pcall(function()
+				return game:HttpGet('https://raw.githubusercontent.com/'..GITHUB_USER..'/'..GITHUB_REPO..'/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('catrewrite/', '')), true)
+			end)
+			
+			if not suc or res == '404: Not Found' or not res then
+				-- Immediately try fallback to original repo
+				warn(`[${BRAND_NAME}] File not in your repo, trying fallback...`)
+				suc, res = pcall(function()
+					return game:HttpGet('https://raw.githubusercontent.com/new-qwertyui/CatV5/'..readfile('catrewrite/profiles/commit.txt')..'/'..select(1, path:gsub('catrewrite/', '')), true)
+				end)
+				if suc and res and res ~= '404: Not Found' then
+					warn(`[${BRAND_NAME}] Using fallback repo for {path}`)
+					break
+				else
+					if attempts >= maxAttempts then
+						error('Failed to download '..path..' from both repos')
+					end
+				end
+			else
+				break
+			end
+		until suc or attempts >= maxAttempts
+		
+		if not suc or res == '404: Not Found' or not res then
+			error('Failed to download '..path)
 		end
+		
 		if path:find('.lua') then
 			res = '\n'..res
 		end
