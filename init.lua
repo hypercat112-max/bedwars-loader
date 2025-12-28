@@ -16,9 +16,9 @@ end
 local license = ({...})[1] or {}
 local developer =  license.Developer or getgenv().catvapedev or false
 local closet = license.Closet or getgenv().closet or false
-local commit = license.Commit or nil -- not meant to be downgradable
+local commit = license.Commit or nil
 
-local BRAND_NAME = 'no t Not cheating'
+local BRAND_NAME = 'Not Cheating Scripts'
 
 local loadstring = function(...)
 	local res, err = loadstring(...)
@@ -112,19 +112,18 @@ if closet then
 end
 
 if gui.Enabled then
-	local window = createinstance('ImageLabel', {
+	local window = createinstance('Frame', {
 		Name = 'Main',
 		Parent = gui,
-		BackgroundTransparency = 1,
+		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+		BorderSizePixel = 0,
 		Size = UDim2.fromOffset(685, 399),
 		ZIndex = 1,
 		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5),
-		ScaleType = Enum.ScaleType.Fit,
-		Image = 'rbxassetid://93496634716737'
+		AnchorPoint = Vector2.new(0.5, 0.5)
 	})
 
-	-- DRAG --
+	Instance.new('UICorner', window)
 
 	local scale
 	
@@ -163,96 +162,57 @@ if gui.Enabled then
 		end
 	end)
 
-	-- EXIT BUTTON --
-
-	local exit = createinstance('ImageButton', {
+	local exit = createinstance('TextButton', {
 		Name = 'Exit',
 		Parent = gui.Main,
-		BackgroundTransparency = 1,
+		BackgroundColor3 = Color3.fromRGB(34, 33, 34),
+		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(624, 23),
 		Size = UDim2.fromOffset(40, 30),
-		AutoButtonColor = false,
 		ZIndex = 2,
-		ImageColor3 = Color3.fromRGB(34, 33, 34),
-		Image = 'rbxassetid://110629770884920',
-		ScaleType = Enum.ScaleType.Fit
+		Text = 'X',
+		TextColor3 = Color3.new(1, 1, 1),
+		TextSize = 14,
+		Font = Enum.Font.Arial
 	})
+
+	Instance.new('UICorner', exit)
 
 	addCallback(exit, function()
 		gui.Enabled = false
 	end)
 
-	createinstance('ImageLabel', {
-		Name = 'Icon',
-		Parent = gui.Main.Exit,
-		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 10, 0.5, 0),
-		Size = UDim2.fromOffset(16, 16),
-		ZIndex = 2,
-		AnchorPoint = Vector2.new(0, 0.5),
-		ImageTransparency = 0.4,
-		ImageColor3 = Color3.new(1, 1, 1),
-		Image = 'rbxassetid://128518278755224',
-		ScaleType = Enum.ScaleType.Fit
-	})
-
-	-- MINIMIZE BUTTON --
-
-	local minimize = createinstance('ImageButton', {
+	local minimize = createinstance('TextButton', {
 		Name = 'Minimize',
 		Parent = gui.Main,
-		BackgroundTransparency = 1,
+		BackgroundColor3 = Color3.fromRGB(34, 33, 34),
+		BorderSizePixel = 0,
 		Position = UDim2.fromOffset(582, 23),
 		ZIndex = 2,
 		Size = UDim2.fromOffset(40, 30),
-		AutoButtonColor = false,
-		ImageColor3 = Color3.fromRGB(34, 33, 34),
-		Image = 'rbxassetid://133363055871405',
-		ScaleType = Enum.ScaleType.Fit
+		Text = '_',
+		TextColor3 = Color3.new(1, 1, 1),
+		TextSize = 14,
+		Font = Enum.Font.Arial
 	})
+
+	Instance.new('UICorner', minimize)
 
 	addCallback(minimize, function() end)
 
-	createinstance('ImageLabel', {
-		Name = 'Icon',
-		Parent = gui.Main.Minimize,
-		BackgroundTransparency = 1,
-		Position = UDim2.new(0, 14, 0.5, 0),
-		Size = UDim2.fromOffset(16, 16),
-		AnchorPoint = Vector2.new(0, 0.5),
-		ImageTransparency = 0.4,
-		ImageColor3 = Color3.new(1, 1, 1),
-		Image = 'rbxassetid://83568668289707',
-		ScaleType = Enum.ScaleType.Fit
-	})
-
-	-- VAPE LOGO --
-
-	createinstance('ImageLabel', {
-		Name = 'textvape',
+	local title = createinstance('TextLabel', {
+		Name = 'Title',
 		Parent = gui.Main,
-		AnchorPoint = Vector2.new(0.48, 0.31),
+		AnchorPoint = Vector2.new(0.5, 0),
 		BackgroundTransparency = 1,
 		ZIndex = 2,
-		Position = UDim2.fromScale(0.48, 0.31),
-		Size = UDim2.fromOffset(70, 70),
-		Image = 'rbxassetid://84228868064393',
-		ScaleType = Enum.ScaleType.Fit
+		Position = UDim2.fromScale(0.5, 0.05),
+		Size = UDim2.fromOffset(200, 40),
+		Text = BRAND_NAME,
+		TextColor3 = Color3.new(1, 1, 1),
+		TextSize = 18,
+		Font = Enum.Font.Arial
 	})
-
-	createinstance('ImageLabel', {
-		Name = 'version',
-		Parent = gui.Main.textvape,
-		BackgroundTransparency = 1,
-		ZIndex = 2,
-		Position = UDim2.fromScale(1, 0.3),
-		Size = UDim2.fromOffset(29, 29),
-		Image = 'rbxassetid://138794287840926',
-		ImageColor3 = Color3.fromRGB(98, 198, 158),
-		ScaleType = Enum.ScaleType.Fit
-	})
-
-	-- LOAD BAR --
 
 	createinstance('Frame', {
 		Name = 'loadbar',
@@ -273,8 +233,6 @@ if gui.Enabled then
 		Size = UDim2.new(0, 0, 1, 0),
 		ZIndex = 2
 	})
-
-	-- ACTION TEXT --
 
 	createinstance('TextLabel', {
 		Name = 'action',
@@ -473,10 +431,11 @@ getgenv().canDebug = canDebug
 getgenv().username = license.Username or getgenv().username
 getgenv().password = license.Password or getgenv().password
 
--- Set up comprehensive error handlers BEFORE loading main code
 local errorHandlerConnection
 local errorCount = 0
 local lastErrorTime = 0
+local seenErrors = {}
+local errorSuppressTime = {}
 
 task.spawn(function()
 	local ScriptContext = game:GetService('ScriptContext')
@@ -485,24 +444,37 @@ task.spawn(function()
 		local msgStr = tostring(message)
 		local currentTime = tick()
 		
-		-- Reset error count if it's been more than 10 seconds since last error
 		if currentTime - lastErrorTime > 10 then
 			errorCount = 0
+			seenErrors = {}
+			errorSuppressTime = {}
 		end
 		errorCount = errorCount + 1
 		lastErrorTime = currentTime
 		
-		-- If too many errors in short time, suppress all to prevent crash
 		if errorCount > 50 then
-			warn(`[${BRAND_NAME}] Too many errors detected, suppressing to prevent crash...`)
 			return true
 		end
 		
-		-- Suppress accessory/character modification errors that shouldn't crash
+		local errorKey = msgStr:match('^[^:]+') or msgStr
+		if seenErrors[errorKey] then
+			seenErrors[errorKey] = seenErrors[errorKey] + 1
+			if seenErrors[errorKey] > 5 then
+				if not errorSuppressTime[errorKey] or currentTime - errorSuppressTime[errorKey] > 30 then
+					warn(`[${BRAND_NAME}] Error "{errorKey}" repeated {seenErrors[errorKey]} times, suppressing for 30 seconds...`)
+					errorSuppressTime[errorKey] = currentTime
+				end
+				return true
+			end
+		else
+			seenErrors[errorKey] = 1
+		end
+		
 		if msgStr:find('accessory') or msgStr:find('wing') or msgStr:find('character') or 
-		   msgStr:find('Could not find') or msgStr:find('Failed to update') then
-			warn(`[${BRAND_NAME}] Non-critical error (suppressed): {msgStr}`)
-			return true -- Suppress the error
+		   msgStr:find('Could not find') or msgStr:find('Failed to update') or
+		   msgStr:find('HumanoidRootPart') or msgStr:find('is not a valid member') or
+		   msgStr:find('C0') or msgStr:find('Co is not') then
+			return true
 		end
 		
 		warn(`[${BRAND_NAME} Error Handler] {message}`)
@@ -512,9 +484,6 @@ task.spawn(function()
 		return true
 	end)
 end)
-
--- Note: table.sort override removed to prevent readonly table errors
--- Sorting errors will be caught by the error handler instead
 
 local function runMainWithRetries()
 	local lastErr = nil
@@ -533,8 +502,8 @@ local function runMainWithRetries()
 						return nil
 					end
 					if errStr:find('accessory') or errStr:find('wing') or errStr:find('Could not find') or 
-					   errStr:find('Failed to update') then
-						warn(`[${BRAND_NAME}] Accessory error suppressed: {errStr}`)
+					   errStr:find('Failed to update') or errStr:find('HumanoidRootPart') or
+					   errStr:find('is not a valid member') or errStr:find('C0') then
 						return nil
 					end
 					return errStr .. '\n' .. debug.traceback()
@@ -556,7 +525,8 @@ local function runMainWithRetries()
 			local errStr = tostring(err)
 			if errStr:find('attempt to call a nil value') or 
 			   errStr:find('accessory') or errStr:find('wing') or 
-			   errStr:find('Could not find') or errStr:find('Failed to update') then
+			   errStr:find('Could not find') or errStr:find('Failed to update') or
+			   errStr:find('HumanoidRootPart') or errStr:find('is not a valid member') then
 				warn(`[${BRAND_NAME}] main.lua has non-critical error (attempt {attempt}), but continuing...`)
 				if attempt == 3 then
 					return true, "Continued despite non-critical error"
@@ -577,7 +547,6 @@ for _, v in Connections do
 	v:Disconnect()
 end
 
--- table.clear might not exist or be readonly, use manual clear instead
 for i = #Connections, 1, -1 do
 	Connections[i] = nil
 end
@@ -595,7 +564,7 @@ if shared.vape then
 	task.spawn(function()
 		local checkCount = 0
 		while true do
-			task.wait(5) -- Check every 5 seconds instead of 1
+			task.wait(5)
 			checkCount = checkCount + 1
 			
 			pcall(function()
@@ -604,7 +573,6 @@ if shared.vape then
 				end
 			end)
 			
-			-- Force garbage collection every 30 checks (2.5 minutes)
 			if checkCount % 30 == 0 then
 				pcall(function()
 					if type(collectgarbage) == 'function' then
@@ -616,10 +584,6 @@ if shared.vape then
 	end)
 end
 
--- Prevent network/remote spam that could crash server
-local remoteCallCount = 0
-local lastRemoteCall = 0
-
 task.spawn(function()
 	local ReplicatedStorage = game:GetService('ReplicatedStorage')
 	
@@ -628,20 +592,17 @@ task.spawn(function()
 	end
 end)
 
--- Memory cleanup to prevent leaks - more aggressive
 task.spawn(function()
 	local cleanupCount = 0
 	while true do
-		task.wait(20) -- Every 20 seconds instead of 30
+		task.wait(20)
 		cleanupCount = cleanupCount + 1
 		
 		pcall(function()
-			-- Force garbage collection
 			if type(collectgarbage) == 'function' then
 				collectgarbage('collect')
 			end
 			
-			-- Clean up connections more aggressively
 			if Connections and #Connections > 50 then
 				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
 				local toRemove = #Connections - 25
@@ -655,13 +616,11 @@ task.spawn(function()
 				end
 			end
 			
-			-- Every 3 minutes, do a deep cleanup
 			if cleanupCount % 9 == 0 then
 				pcall(function()
-					-- Clear any accumulated data
 					if type(collectgarbage) == 'function' then
 						collectgarbage('collect')
-						collectgarbage('collect') -- Run twice for better cleanup
+						collectgarbage('collect')
 					end
 				end)
 			end
@@ -669,21 +628,18 @@ task.spawn(function()
 	end
 end)
 
--- Additional periodic health check to prevent crashes
 task.spawn(function()
 	local healthCheckCount = 0
 	while true do
-		task.wait(30) -- Every 30 seconds
+		task.wait(30)
 		healthCheckCount = healthCheckCount + 1
 		
 		pcall(function()
-			-- Check if game is still running
 			local RunService = game:GetService('RunService')
 			if not RunService or not RunService:IsRunning() then
 				return
 			end
 			
-			-- Every 2 minutes, verify critical services exist
 			if healthCheckCount % 4 == 0 then
 				local services = {
 					'Players',
@@ -702,7 +658,6 @@ task.spawn(function()
 				end
 			end
 			
-			-- Every 5 minutes, do aggressive cleanup
 			if healthCheckCount % 10 == 0 then
 				pcall(function()
 					if type(collectgarbage) == 'function' then
@@ -714,3 +669,4 @@ task.spawn(function()
 		end)
 	end
 end)
+
