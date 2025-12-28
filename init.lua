@@ -477,7 +477,17 @@ task.spawn(function()
 		errorCount = errorCount + 1
 		lastErrorTime = currentTime
 		
-		if errorCount > 50 then
+		if errorCount > 20 then
+			return true
+		end
+		
+		if errorCount > 100 then
+			warn(`[${BRAND_NAME}] Critical: Too many errors ({errorCount}), disabling error handler to prevent crash...`)
+			pcall(function()
+				if errorHandlerConnection then
+					errorHandlerConnection:Disconnect()
+				end
+			end)
 			return true
 		end
 		
@@ -498,7 +508,9 @@ task.spawn(function()
 		if msgStr:find('accessory') or msgStr:find('wing') or msgStr:find('character') or 
 		   msgStr:find('Could not find') or msgStr:find('Failed to update') or
 		   msgStr:find('HumanoidRootPart') or msgStr:find('is not a valid member') or
-		   msgStr:find('C0') or msgStr:find('Co is not') then
+		   msgStr:find('C0') or msgStr:find('Co is not') or
+		   msgStr:find('Parent property') or msgStr:find('is locked') or
+		   msgStr:find('spirit_dagger') or msgStr:find('spirit-assassin') then
 			return true
 		end
 		
@@ -523,12 +535,13 @@ local function runMainWithRetries()
 				local execOk, execErr = xpcall(result, function(err)
 					local errStr = tostring(err)
 					if errStr:find('attempt to call a nil value') then
-						warn(`[${BRAND_NAME}] Warning: Nil function call detected, continuing anyway...`)
 						return nil
 					end
 					if errStr:find('accessory') or errStr:find('wing') or errStr:find('Could not find') or 
 					   errStr:find('Failed to update') or errStr:find('HumanoidRootPart') or
-					   errStr:find('is not a valid member') or errStr:find('C0') then
+					   errStr:find('is not a valid member') or errStr:find('C0') or
+					   errStr:find('Parent property') or errStr:find('is locked') or
+					   errStr:find('spirit_dagger') or errStr:find('spirit-assassin') then
 						return nil
 					end
 					return errStr .. '\n' .. debug.traceback()
@@ -551,7 +564,9 @@ local function runMainWithRetries()
 			if errStr:find('attempt to call a nil value') or 
 			   errStr:find('accessory') or errStr:find('wing') or 
 			   errStr:find('Could not find') or errStr:find('Failed to update') or
-			   errStr:find('HumanoidRootPart') or errStr:find('is not a valid member') then
+			   errStr:find('HumanoidRootPart') or errStr:find('is not a valid member') or
+			   errStr:find('Parent property') or errStr:find('is locked') or
+			   errStr:find('spirit_dagger') or errStr:find('spirit-assassin') then
 				warn(`[${BRAND_NAME}] main.lua has non-critical error (attempt {attempt}), but continuing...`)
 				if attempt == 3 then
 					return true, "Continued despite non-critical error"
@@ -611,18 +626,28 @@ end
 
 task.spawn(function()
 	local cleanupCount = 0
+	local lastMemory = 0
 	while true do
-		task.wait(20)
-		cleanupCount = cleanupCount + 1
-		
-		pcall(function()
+		local ok = pcall(function()
+			task.wait(15)
+			cleanupCount = cleanupCount + 1
+			
 			if type(collectgarbage) == 'function' then
-				collectgarbage('collect')
+				local currentMemory = collectgarbage('count')
+				if currentMemory > lastMemory * 1.5 and lastMemory > 0 then
+					warn(`[${BRAND_NAME}] Memory spike detected ({currentMemory}MB), forcing cleanup...`)
+					collectgarbage('collect')
+					collectgarbage('collect')
+					collectgarbage('collect')
+				else
+					collectgarbage('collect')
+				end
+				lastMemory = currentMemory
 			end
 			
-			if Connections and #Connections > 50 then
+			if Connections and #Connections > 30 then
 				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
-				local toRemove = #Connections - 25
+				local toRemove = #Connections - 15
 				for i = toRemove, 1, -1 do
 					pcall(function()
 						if Connections[i] then
@@ -633,7 +658,7 @@ task.spawn(function()
 				end
 			end
 			
-			if cleanupCount % 9 == 0 then
+			if cleanupCount % 6 == 0 then
 				pcall(function()
 					if type(collectgarbage) == 'function' then
 						collectgarbage('collect')
@@ -642,6 +667,10 @@ task.spawn(function()
 				end)
 			end
 		end)
+		
+		if not ok then
+			task.wait(30)
+		end
 	end
 end)
 
