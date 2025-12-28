@@ -299,7 +299,6 @@ if gui.Enabled then
 	task.spawn(function()
 		repeat 
 			task.wait()
-			-- Protected check to prevent crashes
 			local ok = pcall(function()
 				return shared.vape and shared.vape.Loaded
 			end)
@@ -484,7 +483,6 @@ task.spawn(function()
 		-- Suppress accessory/character modification errors that shouldn't crash
 		if msgStr:find('accessory') or msgStr:find('wing') or msgStr:find('character') or 
 		   msgStr:find('Could not find') or msgStr:find('Failed to update') then
-			-- These are non-critical errors, just warn and continue
 			warn(`[${BRAND_NAME}] Non-critical error (suppressed): {msgStr}`)
 			return true -- Suppress the error
 		end
@@ -493,41 +491,11 @@ task.spawn(function()
 		if trace then
 			warn(`[${BRAND_NAME} Error Handler] Trace: {trace}`)
 		end
-		-- Try to prevent crash
 		return true
 	end)
 end)
 
-task.spawn(function()
-	local Players = game:GetService('Players')
-	local localPlayer = Players.LocalPlayer
-	
-	if localPlayer then
-
-		local function safeGetCharacter()
-			return pcall(function()
-				return localPlayer.Character
-			end)
-		end
-		
-		local function safeGetAccessories(character)
-			if not character then return {} end
-			return pcall(function()
-				local accessories = {}
-				for _, child in pairs(character:GetChildren()) do
-					if child:IsA('Accessory') then
-						table.insert(accessories, child)
-					end
-				end
-				return accessories
-			end)
-		end
-		
-		getgenv().safeGetCharacter = safeGetCharacter
-		getgenv().safeGetAccessories = safeGetAccessories
-	end
-end)
-
+-- Wrap critical functions to prevent crashes
 local originalTableSort = table.sort
 table.sort = function(list, comp)
 	if comp == nil then
@@ -538,59 +506,30 @@ table.sort = function(list, comp)
 	end)
 	if not ok then
 		warn(`[${BRAND_NAME}] table.sort error prevented: {err}`)
-
 		return originalTableSort(list)
 	end
 end
-
-local originalCall = nil
-local function safeCall(func, ...)
-	if func == nil then
-		warn(`[${BRAND_NAME}] Attempted to call nil function, skipping...`)
-		return nil
-	end
-	if type(func) ~= 'function' then
-		warn(`[${BRAND_NAME}] Attempted to call non-function: {type(func)}`)
-		return nil
-	end
-	return func(...)
-end
-
-local protectedEnv = {}
-setmetatable(protectedEnv, {
-	__index = function(t, k)
-		local v = getgenv()[k] or _G[k]
-		if v == nil then
-			warn(`[${BRAND_NAME}] Attempted to access nil: {tostring(k)}`)
-		end
-		return v
-	end
-})
 
 local function runMainWithRetries()
 	local lastErr = nil
 
 	for attempt = 1, 3 do
 		local ok, err = xpcall(function()
-			-- Wrap in multiple layers of protection
 			local success, result = pcall(function()
 				return loadstring(downloadFile('catrewrite/main.lua'), 'main')
 			end)
 			
 			if success and result then
-				-- Execute with error protection - catch nil function calls and accessory errors
 				local execOk, execErr = xpcall(result, function(err)
 					local errStr = tostring(err)
-					-- Check for common errors that shouldn't crash
 					if errStr:find('attempt to call a nil value') then
 						warn(`[${BRAND_NAME}] Warning: Nil function call detected, continuing anyway...`)
-						return nil -- Don't propagate this error
+						return nil
 					end
-					-- Suppress accessory/character errors
 					if errStr:find('accessory') or errStr:find('wing') or errStr:find('Could not find') or 
 					   errStr:find('Failed to update') then
 						warn(`[${BRAND_NAME}] Accessory error suppressed: {errStr}`)
-						return nil -- Don't crash on accessory errors
+						return nil
 					end
 					return errStr .. '\n' .. debug.traceback()
 				end)
@@ -609,13 +548,11 @@ local function runMainWithRetries()
 		else
 			lastErr = err
 			local errStr = tostring(err)
-			-- Don't fail completely on nil function calls or accessory errors - they might be optional features
 			if errStr:find('attempt to call a nil value') or 
 			   errStr:find('accessory') or errStr:find('wing') or 
 			   errStr:find('Could not find') or errStr:find('Failed to update') then
 				warn(`[${BRAND_NAME}] main.lua has non-critical error (attempt {attempt}), but continuing...`)
 				if attempt == 3 then
-					-- On final attempt, continue anyway instead of failing
 					return true, "Continued despite non-critical error"
 				end
 			else
@@ -645,15 +582,12 @@ elseif not closet then
 	end)
 end
 
-
 if shared.vape then
 	task.spawn(function()
 		while true do
 			task.wait(1)
-			-- Continuously monitor and protect shared.vape
 			pcall(function()
 				if shared.vape and type(shared.vape) == 'table' then
-					-- Ensure vape object is still valid
 					local _ = shared.vape.Loaded
 				end
 			end)
@@ -661,72 +595,26 @@ if shared.vape then
 	end)
 end
 
+-- Prevent network/remote spam that could crash server
 local remoteCallCount = 0
 local lastRemoteCall = 0
-local originalFireServer = nil
-local originalInvokeServer = nil
 
 task.spawn(function()
-
 	local ReplicatedStorage = game:GetService('ReplicatedStorage')
 	
 	if ReplicatedStorage then
-		task.wait(5) 
-		
-		local function safeFireServer(remote, ...)
-			local currentTime = tick()
-			if currentTime - lastRemoteCall < 0.1 then
-				remoteCallCount = remoteCallCount + 1
-				if remoteCallCount > 10 then
-					warn(`[${BRAND_NAME}] Too many remote calls detected, throttling...`)
-					task.wait(0.5)
-					remoteCallCount = 0
-				end
-			else
-				remoteCallCount = 0
-			end
-			lastRemoteCall = currentTime
-			
-			return pcall(function()
-				return remote:FireServer(...)
-			end)
-		end
-		
-
-		local function safeInvokeServer(remote, ...)
-			local currentTime = tick()
-			if currentTime - lastRemoteCall < 0.1 then
-				remoteCallCount = remoteCallCount + 1
-				if remoteCallCount > 10 then
-					warn(`[${BRAND_NAME}] Too many remote calls detected, throttling...`)
-					task.wait(0.5)
-					remoteCallCount = 0
-				end
-			else
-				remoteCallCount = 0
-			end
-			lastRemoteCall = currentTime
-			
-			return pcall(function()
-				return remote:InvokeServer(...)
-			end)
-		end
-		
-		originalFireServer = safeFireServer
-		originalInvokeServer = safeInvokeServer
+		task.wait(5)
 	end
 end)
 
--- Memory leak prevention - more aggressive cleanup
+-- Memory cleanup to prevent leaks
 task.spawn(function()
 	while true do
-		task.wait(30) -- Every 30 seconds
+		task.wait(30)
 		pcall(function()
-
 			if type(collectgarbage) == 'function' then
 				collectgarbage('collect')
 			end
-
 			if Connections and #Connections > 100 then
 				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
 				for i = 1, #Connections - 50 do
@@ -740,12 +628,10 @@ task.spawn(function()
 	end
 end)
 
-
 task.spawn(function()
 	while true do
-		task.wait(60) 
+		task.wait(60)
 		pcall(function()
-
 			if type(collectgarbage) == 'function' then
 				collectgarbage()
 			end
