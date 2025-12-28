@@ -29,15 +29,20 @@ local loadstring = function(...)
 end
 
 if not commit or commit == 'main' then
-	local _, subbed = pcall(function()
+	local success, subbed = pcall(function()
 		return game:HttpGet('https://github.com/new-qwertyui/CatV5')
 	end)
-	commit = subbed:find('currentOid')
-	commit = commit and subbed:sub(commit + 13, commit + 52) or nil
-	commit = commit and #commit == 40 and commit or 'main'
+	
+	if success and subbed and type(subbed) == 'string' then
+		commit = subbed:find('currentOid')
+		commit = commit and subbed:sub(commit + 13, commit + 52) or nil
+		commit = commit and #commit == 40 and commit or 'main'
 
-	if #commit > 7 then
-		commit = commit:sub(1, 7)
+		if commit and #commit > 7 then
+			commit = commit:sub(1, 7)
+		end
+	else
+		commit = 'main'
 	end
 end
 
