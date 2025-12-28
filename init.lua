@@ -112,18 +112,17 @@ if closet then
 end
 
 if gui.Enabled then
-	local window = createinstance('Frame', {
+	local window = createinstance('ImageLabel', {
 		Name = 'Main',
 		Parent = gui,
-		BackgroundColor3 = Color3.fromRGB(30, 30, 30),
-		BorderSizePixel = 0,
+		BackgroundTransparency = 1,
 		Size = UDim2.fromOffset(685, 399),
 		ZIndex = 1,
 		Position = UDim2.fromScale(0.5, 0.5),
-		AnchorPoint = Vector2.new(0.5, 0.5)
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		ScaleType = Enum.ScaleType.Fit,
+		Image = 'rbxassetid://93496634716737'
 	})
-
-	Instance.new('UICorner', window)
 
 	local scale
 	
@@ -162,56 +161,78 @@ if gui.Enabled then
 		end
 	end)
 
-	local exit = createinstance('TextButton', {
+	local exit = createinstance('ImageButton', {
 		Name = 'Exit',
 		Parent = gui.Main,
-		BackgroundColor3 = Color3.fromRGB(34, 33, 34),
-		BorderSizePixel = 0,
+		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(624, 23),
 		Size = UDim2.fromOffset(40, 30),
+		AutoButtonColor = false,
 		ZIndex = 2,
-		Text = 'X',
-		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = 14,
-		Font = Enum.Font.Arial
+		ImageColor3 = Color3.fromRGB(34, 33, 34),
+		Image = 'rbxassetid://110629770884920',
+		ScaleType = Enum.ScaleType.Fit
 	})
-
-	Instance.new('UICorner', exit)
 
 	addCallback(exit, function()
 		gui.Enabled = false
 	end)
 
-	local minimize = createinstance('TextButton', {
+	createinstance('ImageLabel', {
+		Name = 'Icon',
+		Parent = gui.Main.Exit,
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 10, 0.5, 0),
+		Size = UDim2.fromOffset(16, 16),
+		ZIndex = 2,
+		AnchorPoint = Vector2.new(0, 0.5),
+		ImageTransparency = 0.4,
+		ImageColor3 = Color3.new(1, 1, 1),
+		Image = 'rbxassetid://128518278755224',
+		ScaleType = Enum.ScaleType.Fit
+	})
+
+	local minimize = createinstance('ImageButton', {
 		Name = 'Minimize',
 		Parent = gui.Main,
-		BackgroundColor3 = Color3.fromRGB(34, 33, 34),
-		BorderSizePixel = 0,
+		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(582, 23),
 		ZIndex = 2,
 		Size = UDim2.fromOffset(40, 30),
-		Text = '_',
-		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = 14,
-		Font = Enum.Font.Arial
+		AutoButtonColor = false,
+		ImageColor3 = Color3.fromRGB(34, 33, 34),
+		Image = 'rbxassetid://133363055871405',
+		ScaleType = Enum.ScaleType.Fit
 	})
-
-	Instance.new('UICorner', minimize)
 
 	addCallback(minimize, function() end)
 
-	local title = createinstance('TextLabel', {
+	createinstance('ImageLabel', {
+		Name = 'Icon',
+		Parent = gui.Main.Minimize,
+		BackgroundTransparency = 1,
+		Position = UDim2.new(0, 14, 0.5, 0),
+		Size = UDim2.fromOffset(16, 16),
+		AnchorPoint = Vector2.new(0, 0.5),
+		ImageTransparency = 0.4,
+		ImageColor3 = Color3.new(1, 1, 1),
+		Image = 'rbxassetid://83568668289707',
+		ScaleType = Enum.ScaleType.Fit
+	})
+
+	createinstance('TextLabel', {
 		Name = 'Title',
 		Parent = gui.Main,
-		AnchorPoint = Vector2.new(0.5, 0),
+		AnchorPoint = Vector2.new(0.48, 0.31),
 		BackgroundTransparency = 1,
 		ZIndex = 2,
-		Position = UDim2.fromScale(0.5, 0.05),
+		Position = UDim2.fromScale(0.48, 0.31),
 		Size = UDim2.fromOffset(200, 40),
 		Text = BRAND_NAME,
 		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = 18,
-		Font = Enum.Font.Arial
+		TextSize = 16,
+		Font = Enum.Font.Arial,
+		TextStrokeTransparency = 0.5
 	})
 
 	createinstance('Frame', {
