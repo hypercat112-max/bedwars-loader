@@ -115,14 +115,18 @@ if gui.Enabled then
 	local window = createinstance('ImageLabel', {
 		Name = 'Main',
 		Parent = gui,
-		BackgroundTransparency = 1,
+		BackgroundColor3 = Color3.fromRGB(25, 25, 25),
+		BackgroundTransparency = 0,
 		Size = UDim2.fromOffset(685, 399),
 		ZIndex = 1,
 		Position = UDim2.fromScale(0.5, 0.5),
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		ScaleType = Enum.ScaleType.Fit,
-		Image = 'rbxassetid://93496634716737'
+		Image = 'rbxassetid://93496634716737',
+		Visible = true
 	})
+	
+	Instance.new('UICorner', window)
 
 	local scale
 	
@@ -223,16 +227,17 @@ if gui.Enabled then
 	createinstance('TextLabel', {
 		Name = 'Title',
 		Parent = gui.Main,
-		AnchorPoint = Vector2.new(0.48, 0.31),
+		AnchorPoint = Vector2.new(0.5, 0.31),
 		BackgroundTransparency = 1,
-		ZIndex = 2,
-		Position = UDim2.fromScale(0.48, 0.31),
-		Size = UDim2.fromOffset(200, 40),
+		ZIndex = 3,
+		Position = UDim2.fromScale(0.5, 0.31),
+		Size = UDim2.fromOffset(300, 40),
 		Text = BRAND_NAME,
 		TextColor3 = Color3.new(1, 1, 1),
-		TextSize = 16,
-		Font = Enum.Font.Arial,
-		TextStrokeTransparency = 0.5
+		TextSize = 20,
+		Font = Enum.Font.GothamBold,
+		TextStrokeTransparency = 0.7,
+		TextStrokeColor3 = Color3.new(0, 0, 0)
 	})
 
 	createinstance('Frame', {
@@ -274,6 +279,21 @@ if gui.Enabled then
 	
 	scale = Instance.new('UIScale', gui.Main)
 	scale.Scale = math.max(gui.AbsoluteSize.X / 1920, 0.485)
+	
+	task.wait(0.1)
+	
+	if gui.Main then
+		gui.Main.Visible = true
+		if gui.Main.BackgroundTransparency == 1 then
+			gui.Main.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+			gui.Main.BackgroundTransparency = 0
+		end
+		for _, child in pairs(gui.Main:GetDescendants()) do
+			if child:IsA('GuiObject') then
+				child.Visible = true
+			end
+		end
+	end
 
 	task.spawn(function()
 		repeat 
