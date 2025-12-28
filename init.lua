@@ -495,20 +495,8 @@ task.spawn(function()
 	end)
 end)
 
--- Wrap critical functions to prevent crashes
-local originalTableSort = table.sort
-table.sort = function(list, comp)
-	if comp == nil then
-		return originalTableSort(list)
-	end
-	local ok, err = pcall(function()
-		return originalTableSort(list, comp)
-	end)
-	if not ok then
-		warn(`[${BRAND_NAME}] table.sort error prevented: {err}`)
-		return originalTableSort(list)
-	end
-end
+-- Note: table.sort override removed to prevent readonly table errors
+-- Sorting errors will be caught by the error handler instead
 
 local function runMainWithRetries()
 	local lastErr = nil
