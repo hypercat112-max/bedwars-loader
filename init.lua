@@ -559,7 +559,10 @@ for _, v in Connections do
 	v:Disconnect()
 end
 
-table.clear(Connections)
+-- table.clear might not exist or be readonly, use manual clear instead
+for i = #Connections, 1, -1 do
+	Connections[i] = nil
+end
 
 if not success then
 	warn(`[${BRAND_NAME}] Failed to initialize: {err}`)
@@ -605,12 +608,16 @@ task.spawn(function()
 			end
 			if Connections and #Connections > 100 then
 				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
-				for i = 1, #Connections - 50 do
+				-- Disconnect and remove first N connections manually to avoid readonly table error
+				local toRemove = #Connections - 50
+				for i = toRemove, 1, -1 do
 					pcall(function()
-						Connections[i]:Disconnect()
+						if Connections[i] then
+							Connections[i]:Disconnect()
+						end
 					end)
+					Connections[i] = nil
 				end
-				table.remove(Connections, 1, #Connections - 50)
 			end
 		end)
 	end
