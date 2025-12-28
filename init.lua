@@ -475,11 +475,29 @@ getgenv().password = license.Password or getgenv().password
 
 -- Set up comprehensive error handlers BEFORE loading main code
 local errorHandlerConnection
+local errorCount = 0
+local lastErrorTime = 0
+
 task.spawn(function()
 	local ScriptContext = game:GetService('ScriptContext')
 	
 	errorHandlerConnection = ScriptContext.Error:Connect(function(message, trace, script)
 		local msgStr = tostring(message)
+		local currentTime = tick()
+		
+		-- Reset error count if it's been more than 10 seconds since last error
+		if currentTime - lastErrorTime > 10 then
+			errorCount = 0
+		end
+		errorCount = errorCount + 1
+		lastErrorTime = currentTime
+		
+		-- If too many errors in short time, suppress all to prevent crash
+		if errorCount > 50 then
+			warn(`[${BRAND_NAME}] Too many errors detected, suppressing to prevent crash...`)
+			return true
+		end
+		
 		-- Suppress accessory/character modification errors that shouldn't crash
 		if msgStr:find('accessory') or msgStr:find('wing') or msgStr:find('character') or 
 		   msgStr:find('Could not find') or msgStr:find('Failed to update') then
@@ -575,13 +593,25 @@ end
 
 if shared.vape then
 	task.spawn(function()
+		local checkCount = 0
 		while true do
-			task.wait(1)
+			task.wait(5) -- Check every 5 seconds instead of 1
+			checkCount = checkCount + 1
+			
 			pcall(function()
 				if shared.vape and type(shared.vape) == 'table' then
 					local _ = shared.vape.Loaded
 				end
 			end)
+			
+			-- Force garbage collection every 30 checks (2.5 minutes)
+			if checkCount % 30 == 0 then
+				pcall(function()
+					if type(collectgarbage) == 'function' then
+						collectgarbage('collect')
+					end
+				end)
+			end
 		end
 	end)
 end
@@ -598,18 +628,23 @@ task.spawn(function()
 	end
 end)
 
--- Memory cleanup to prevent leaks
+-- Memory cleanup to prevent leaks - more aggressive
 task.spawn(function()
+	local cleanupCount = 0
 	while true do
-		task.wait(30)
+		task.wait(20) -- Every 20 seconds instead of 30
+		cleanupCount = cleanupCount + 1
+		
 		pcall(function()
+			-- Force garbage collection
 			if type(collectgarbage) == 'function' then
 				collectgarbage('collect')
 			end
-			if Connections and #Connections > 100 then
+			
+			-- Clean up connections more aggressively
+			if Connections and #Connections > 50 then
 				warn(`[${BRAND_NAME}] Too many connections ({#Connections}), cleaning up...`)
-				-- Disconnect and remove first N connections manually to avoid readonly table error
-				local toRemove = #Connections - 50
+				local toRemove = #Connections - 25
 				for i = toRemove, 1, -1 do
 					pcall(function()
 						if Connections[i] then
@@ -619,16 +654,62 @@ task.spawn(function()
 					Connections[i] = nil
 				end
 			end
+			
+			-- Every 3 minutes, do a deep cleanup
+			if cleanupCount % 9 == 0 then
+				pcall(function()
+					-- Clear any accumulated data
+					if type(collectgarbage) == 'function' then
+						collectgarbage('collect')
+						collectgarbage('collect') -- Run twice for better cleanup
+					end
+				end)
+			end
 		end)
 	end
 end)
 
+-- Additional periodic health check to prevent crashes
 task.spawn(function()
+	local healthCheckCount = 0
 	while true do
-		task.wait(60)
+		task.wait(30) -- Every 30 seconds
+		healthCheckCount = healthCheckCount + 1
+		
 		pcall(function()
-			if type(collectgarbage) == 'function' then
-				collectgarbage()
+			-- Check if game is still running
+			local RunService = game:GetService('RunService')
+			if not RunService or not RunService:IsRunning() then
+				return
+			end
+			
+			-- Every 2 minutes, verify critical services exist
+			if healthCheckCount % 4 == 0 then
+				local services = {
+					'Players',
+					'ReplicatedStorage',
+					'UserInputService',
+					'TweenService'
+				}
+				
+				for _, serviceName in ipairs(services) do
+					pcall(function()
+						local service = game:GetService(serviceName)
+						if not service then
+							warn(`[${BRAND_NAME}] Warning: Service {serviceName} not found`)
+						end
+					end)
+				end
+			end
+			
+			-- Every 5 minutes, do aggressive cleanup
+			if healthCheckCount % 10 == 0 then
+				pcall(function()
+					if type(collectgarbage) == 'function' then
+						collectgarbage('collect')
+						collectgarbage('collect')
+					end
+				end)
 			end
 		end)
 	end
